@@ -1,0 +1,55 @@
+path "kv" {                                                                                                                                                 
+    capabilities = ["list"]                                                                                                                                  
+}                                                                                                                                                            
+
+path "auth/token/lookup-self" {
+  capabilities = ["read"]
+}
+
+path "auth/token/renew" {
+  capabilities = ["update", "create"]
+}
+
+path "auth/approle/role/observatory/secret-id" {
+  capabilities = ["read", "create", "update", "list"]
+}
+
+
+path "gcpcab/cab/config/myconfig" {
+    capabilities = ["create", "update", "delete"]
+    allowed_parameters = {
+      "project" = ["$PROJECT_ID"] 
+      "target_service_account" = ["$IMPERSONATED_SERVICE_ACCOUNT"]
+      "duration" = ["3000"]
+      "scopes" = ["https://www.googleapis.com/auth/cloud-platform"]
+      "restricted" = [true]
+      "bindings" = ["{\"accessBoundaryRules\" : [	  {		\"availableResource\" : \"//storage.googleapis.com/projects/_/buckets/$BUCKET_1\",		\"availablePermissions\": [\"inRole:roles/storage.objectViewer\"]      },       	]}"]
+  }
+}
+
+path "gcpcab/cab/certname12020" {
+    capabilities = ["create", "update", "delete"]
+    allowed_parameters = {    
+      "config" = ["myconfig"]
+  }
+}
+
+path "gcpcab/cab/config/myunrestrictedconfig" {
+    capabilities = ["create", "update", "delete"]
+    allowed_parameters = {
+      "project" = ["$PROJECT_ID"] 
+      "target_service_account" = ["$IMPERSONATED_SERVICE_ACCOUNT"]
+      "duration" = ["3000"]
+      "scopes" = ["https://www.googleapis.com/auth/cloud-platform"]
+      "restricted" = [false]
+  }
+}
+
+path "gcpcab/cab/certname22020" {
+    capabilities = ["create", "update", "delete"]
+    allowed_parameters = {    
+      "config" = ["myunrestrictedconfig"]
+      "duration" = ["3000"]
+      "bindings" = []
+  }
+}
