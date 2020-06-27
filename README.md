@@ -154,9 +154,18 @@ At this point, Vault is using the service account defined in `GOOGLE_APPLICATION
 
 In a new window, enable the plugin
 
+For vault in `-dev` mode:
+
 ```bash
 export VAULT_ADDR='http://localhost:8200'
-vault write sys/plugins/catalog/gcpcab   sha_256="$(shasum -a 256 bin/vault-plugin-secrets-gcp-cab | cut -d " " -f1)"  command="vault-plugin-secrets-gcp-cab"
+
+export SHASUM=$(shasum -a 256 "bin/vault-plugin-secrets-gcp-cab" | cut -d " " -f1)
+
+vault plugin register \
+    -sha256="${SHASUM}" \
+    -command="vault-plugin-secrets-gcp-cab" \
+    secret gcpcab  
+
 vault secrets enable -path="gcpcab" --plugin-name='vault-plugin-secrets-gcp-cab' plugin
 ```
 
@@ -341,4 +350,29 @@ curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" htt
 ```
 
 
-The vautl_token owner has set their own CAB config but one that is still restricted to the parent tokens' IAM capabilities
+The vault owner has set their own CAB config but one that is still restricted to the parent tokens' IAM capabilities
+
+
+### Vault Plugin Registration for non-dev mode
+
+If your Vault is running in non-dev mode and you uses our own Certs for TLS in `server.conf`:
+
+```hcl
+listener "tcp" {
+  address = "vault.domain.com:8200"
+  tls_cert_file = "/path/to/tls_crt_vault.pem"
+  tls_key_file = "/path/to/tls_key_vault.pem"
+}
+api_addr = "https://vault.domain.com:8200"
+plugin_directory = "/path/to/vault/plugins"
+```
+
+Then register the plugin and specify the the path to the TLS Certificate Vault server uses (`-args="-ca-cert=..."`):
+
+```bash
+export VAULT_CACERT=/path/to/tls_cacert.pem
+vault plugin register \
+    -sha256="${SHASUM}" \
+    -command="vault-plugin-secrets-gcp-cab" \
+    -args="-ca-cert=$VAULT_CACERT" secret gcpcab
+```
