@@ -86,7 +86,6 @@ Create two GCS Buckets and allow `generic-server` permissions on both.
 
 
 ```bash
-
 export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
 export IMPERSONATED_SERVICE_ACCOUNT=generic-server@$PROJECT_ID.iam.gserviceaccount.com
@@ -220,7 +219,7 @@ EOF
 vault token create -policy=unrestricted-policy
 ```
 
-#### Use VAULT_TOKEN (restricted)
+#### Restricted TOKEN
 
 In a new window, export the `VAULT_ADDR` and `VAULT_TOKEN` that was associated with the restricted policy:
 
@@ -250,7 +249,6 @@ Now use that token to access GCS buckets:
 ```bash
 export TOKEN=ya29.dr....
 
-
 curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_1/o
 curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_2/o
 
@@ -261,7 +259,7 @@ curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" htt
 The CAB rule `cab.json` we defined allowed only access to `$BUCKET_1` so that explains the latter `403`
 
 
-#### Use VAULT_TOKEN (unrestricted)
+#### Unrestricted TOKEN
 
 The unrestricted policy was originally set with `reestricted=false` flag which means a `VAULT_TOKEN` that uses it
 can define the CAB rule _but not the service account being impersonated_
@@ -303,6 +301,33 @@ curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" htt
 ```
 Since the derived CAB config the user set allows for both bucket read, you'll see `200` responses
 
+### Impersonated TOKEN
+
+You can also optionally request a completely unrestricted token.  That is, you can apply a policy to return the non attenuated token for `IMPERSONATED_SERVICE_ACCOUNT`.
+
+To do this, specify `restricted=false` and `raw_token=true` in the policy config:
+
+```bash
+vault write gcpcab/cab/config/mytotallyunrestrictedconfig  \
+ project="$PROJECT_ID"  \
+ target_service_account="$IMPERSONATED_SERVICE_ACCOUNT"  \
+ scopes="https://www.googleapis.com/auth/cloud-platform"  \
+ restricted=false \
+ raw_token=true
+
+vault policy write impersonated-policy -<<EOF
+path "gcpcab/cab/certname62020" {
+    capabilities = ["update", "delete"]
+    allowed_parameters = {    
+      "config" = ["mytotallyunrestrictedconfig"]
+  }
+}
+EOF
+
+vault token create -policy=impersonated-policy
+
+vault write gcpcab/cab/certname62020 config="mytotallyunrestrictedconfig"
+```
 
 ### Vault Plugin Registration for non-dev mode
 

@@ -28,8 +28,10 @@ type ConfigSpec struct {
 	TargetServiceAccount string   `json:"target_service_account"`
 	Project              string   `json:"project"`
 	Scopes               []string `json:"scopes"`
+	Delegates            []string `json:"delegates"`
 	Duration             int      `json:"duration"`
 	Bindings             CABRules `json:cabrules`
+	RawToken             bool     `json:raw_token`
 }
 
 // Key retrieves the named key from the storage backend, or an error if one does

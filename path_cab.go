@@ -113,15 +113,13 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	}
 	dlifetime := time.Duration(lifetime) * time.Second
 
-	// TODO: delegates
-	delegates := []string{}
 	tokenSource, err := sal.ImpersonatedTokenSource(
 		&sal.ImpersonatedTokenConfig{
 			RootTokenSource: creds.TokenSource,
 			TargetPrincipal: k.TargetServiceAccount,
-			Lifetime:        dlifetime,
-			Delegates:       delegates,
 			TargetScopes:    k.Scopes,
+			Lifetime:        dlifetime,
+			Delegates:       k.Delegates,
 		},
 	)
 	if err != nil {
@@ -132,7 +130,16 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
 	}
-	b.Logger().Debug("Issued access_token %v ", toki.AccessToken)
+	//b.Logger().Debug("Issued access_token %v ", toki.AccessToken)
+
+	if k.RawToken && !k.Restricted {
+		b.Logger().Debug("Returning raw impersonated access_token")
+		return &logical.Response{
+			Data: map[string]interface{}{
+				"access_token": toki.AccessToken,
+			},
+		}, nil
+	}
 
 	var salsrules []sal.AccessBoundaryRule
 	var cabRules []CABRule
@@ -152,7 +159,7 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 		salsrules = append(salsrules, rule)
 	}
 
-	b.Logger().Debug("ACCESS BOUNDARY RULE %v ", salsrules)
+	b.Logger().Debug("Access Boundary Rule %v ", salsrules)
 
 	downScopedTokenSource, err := sal.DownScopedTokenSource(
 		&sal.DownScopedTokenConfig{

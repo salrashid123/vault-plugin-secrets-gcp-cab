@@ -39,9 +39,16 @@ Is this CAB token restricted to the path parameters.
 			},
 			"scopes": &framework.FieldSchema{
 				Type:    framework.TypeCommaStringSlice,
-				Default: true,
+				Default: []string{"https://www.googleapis.com/auth/cloud-platform"},
 				Description: `
 Scopes to apply to the Impersonated TOken
+`,
+			},
+			"delegates": &framework.FieldSchema{
+				Type:    framework.TypeCommaStringSlice,
+				Default: []string{},
+				Description: `
+Delegates for Impersonation
 `,
 			},
 			"duration": &framework.FieldSchema{
@@ -63,6 +70,14 @@ Bindings to apply to the CAB
 				Type: framework.TypeString,
 				Description: `
 Service Account to issue the CAB for
+`,
+			},
+
+			"raw_token": &framework.FieldSchema{
+				Type:    framework.TypeBool,
+				Default: false,
+				Description: `
+Return raw access_token without CAB (i.,e just impersonation)
 `,
 			},
 		},
@@ -96,6 +111,8 @@ func (b *backend) pathCABConfigRead(ctx context.Context, req *logical.Request, d
 		"duration":               k.Duration,
 		"project":                k.Project,
 		"bindings":               k.Bindings,
+		"delegates":              k.Delegates,
+		"raw_token":              k.RawToken,
 	}
 
 	return &logical.Response{
@@ -129,6 +146,9 @@ func (b *backend) pathCABConfigWrite(ctx context.Context, req *logical.Request, 
 	if v, ok := d.GetOk("scopes"); ok {
 		k.Scopes = v.([]string)
 	}
+	if v, ok := d.GetOk("delegates"); ok {
+		k.Delegates = v.([]string)
+	}
 	if v, ok := d.GetOk("duration"); ok {
 		k.Duration = v.(int)
 	}
@@ -152,6 +172,14 @@ func (b *backend) pathCABConfigWrite(ctx context.Context, req *logical.Request, 
 			}
 			k.Bindings = cab
 		}
+	}
+
+	if v, ok := d.GetOk("raw_token"); ok {
+		k.RawToken = v.(bool)
+	}
+
+	if k.Restricted && k.RawToken {
+		return logical.ErrorResponse("Cannot request raw_token for restricted key"), logical.ErrInvalidRequest
 	}
 
 	// Save it
