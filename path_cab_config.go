@@ -70,7 +70,6 @@ Service Account to issue the CAB for
 
 		Callbacks: map[logical.Operation]framework.OperationFunc{
 			logical.ReadOperation:   withFieldValidator(b.pathCABConfigRead),
-			logical.CreateOperation: withFieldValidator(b.pathCABConfigWrite),
 			logical.UpdateOperation: withFieldValidator(b.pathCABConfigWrite),
 			logical.DeleteOperation: withFieldValidator(b.pathCABConfigDelete),
 		},

@@ -11,10 +11,10 @@ In other words, this plugin does not create new service accounts but rather assu
 
 There are two modes of operation:
 
-1. Restricted Token
+1. `Restricted Token`
    In this mode, the VAULT admin defines a policy that stipulates the specific service account a Vault Policy can assume and the CAB resources they apply to.  A `VAULT_TOKEN` bearer cannot request extensions to include resources beyond what the admin defined
 
-2. Unrestricted Token
+2. `Unrestricted Token`
    In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to  request a CAB with resources it wishes to access.  That is, the vault admin defines the service account to impersonate and leaves it upto the user to define the set of resources the `access_token` is valid against.  The user cannot ofcourse acquire a valid token capable of accessing any resource the impersonated credential doens't have access to anyway.
 
 *Downscoped tokens only work with certain services like GCS*
@@ -119,7 +119,6 @@ gcloud iam service-accounts add-iam-policy-binding  generic-server@$PROJECT_ID.i
 
 Configure the `.hcl` and CAB configuration files to use
 
-
 `cab.json.tmpl` defines a rule that allows only access to one of the two buckets
 `cab_override.json.tmpl` defines a rule that allows access to both buckets
 
@@ -172,7 +171,10 @@ vault secrets enable -path="gcpcab" --plugin-name='vault-plugin-secrets-gcp-cab'
 #### Configure Policy
 
 
-Then configure the policy.   Make sure the the environment variables are set
+Then configure the policy you are interested in.   Make sure the the environment variables are set.
+
+The following will configure both a restricted and unrestricted policy:
+
 ```bash
 export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
@@ -193,31 +195,34 @@ vault write gcpcab/cab/config/myunrestrictedconfig \
   duration="3000" \
   restricted=false 
 
-vault policy write cert-policy tokenpolicy.hcl
-vault token create -policy=cert-policy
+vault policy write restricted-policy -<<EOF
+path "gcpcab/cab/certname12020" {
+    capabilities = ["update", "delete"]
+    allowed_parameters = {    
+      "config" = ["myconfig"]
+  }
+}
+EOF
+
+vault token create -policy=restricted-policy
+
+vault policy write unrestricted-policy -<<EOF
+path "gcpcab/cab/certname22020" {
+    capabilities = ["update", "delete"]
+    allowed_parameters = {    
+      "config" = ["myunrestrictedconfig"]
+      "duration" = ["3000"]
+      "bindings" = []
+  }
+}
+EOF
+
+vault token create -policy=unrestricted-policy
 ```
-
-This will result in a `VAULT_TOKEN` that is authorized for those paths
-
-```
-    Success! Uploaded policy: cert-policy
-    Key                  Value
-    ---                  -----
-    token                s.ZLCMHwtDZiWsui8LaVQF8I7A
-    token_accessor       treXG4U8cj2L4GUX2BFWWPSo
-    token_duration       768h
-    token_renewable      true
-    token_policies       ["cert-policy" "default"]
-    identity_policies    []
-    policies             ["cert-policy" "default"]
-
-```
-
-The `token create` command will provide a `VAULT_TOKEN` that is restricted to the policy defined in `tokenpolicy.hcl`
 
 #### Use VAULT_TOKEN (restricted)
 
-In a new window, export the `VAULT_ADDR` and `VAULT_TOKEN`:
+In a new window, export the `VAULT_ADDR` and `VAULT_TOKEN` that was associated with the restricted policy:
 
 ```bash
 export VAULT_ADDR='http://localhost:8200'
@@ -234,7 +239,6 @@ And attempt to get the new access token:
 
 ```bash
 vault write gcpcab/cab/certname12020 config="myconfig"
-
 
 Key             Value
 ---             -----
@@ -257,63 +261,12 @@ curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" htt
 The CAB rule `cab.json` we defined allowed only access to `$BUCKET_1` so that explains the latter `403`
 
 
-Now try to use the same `VAULT_TOKEN` to ask for your own user-defined bindings:
-
-This won't work since our we never defined the policy to allow that path with those parameters
-```
-
-```bash
-vault write gcpcab/cab/certname12020 \
-    config="myconfig" bindings=@cab_override.json    
-
-Error writing data to gcpcab/cab/certname12020: Error making API request.
-
-URL: PUT http://localhost:8200/v1/gcpcab/cab/certname12020
-Code: 403. Errors:
-
-* 1 error occurred:
-	* permission denied
-
-```
-
-Note the `allowed_parameters` do not include the `bindings=` flag:
-
-```hcl
-path "gcpcab/cab/certname12020" {
-    capabilities = ["create", "update", "delete"]
-    allowed_parameters = {    
-      "config" = ["myconfig"]
-  }
-}
-```
-
 #### Use VAULT_TOKEN (unrestricted)
 
-`tokenpolicy.hcl` also allowed that same token to create its own CAB definition.  This is allowed through the `reestricted=false` flag
+The unrestricted policy was originally set with `reestricted=false` flag which means a `VAULT_TOKEN` that uses it
+can define the CAB rule _but not the service account being impersonated_
 
-```hcl
-path "gcpcab/cab/config/myunrestrictedconfig" {
-    capabilities = ["create", "update", "delete"]
-    allowed_parameters = {
-      "project" = ["$PROJECT_ID"] 
-      "target_service_account" = ["$IMPERSONATED_SERVICE_ACCOUNT"]
-      "duration" = ["3000"]
-      "scopes" = ["https://www.googleapis.com/auth/cloud-platform"]
-      "restricted" = [false]
-  }
-}
-
-path "gcpcab/cab/certname22020" {
-    capabilities = ["create", "update", "delete"]
-    allowed_parameters = {    
-      "config" = ["myunrestrictedconfig"]
-      "duration" = [3000]
-      "bindings" = []
-  }
-}
-
-```
-The corresponding CAB definition to do the override would be:  `cab_override.json`
+Use the corresponding CAB definition to do the override:  `cab_override.json` which allows read access to both buckets
 
 ```json
 {
@@ -348,9 +301,7 @@ curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" htt
 200
 200
 ```
-
-
-The vault owner has set their own CAB config but one that is still restricted to the parent tokens' IAM capabilities
+Since the derived CAB config the user set allows for both bucket read, you'll see `200` responses
 
 
 ### Vault Plugin Registration for non-dev mode
@@ -375,4 +326,13 @@ vault plugin register \
     -sha256="${SHASUM}" \
     -command="vault-plugin-secrets-gcp-cab" \
     -args="-ca-cert=$VAULT_CACERT" secret gcpcab
+```
+
+### Specify credentials per mount
+
+By default, the plugin will use `Application Default Credentials` to access GCP CA.  If you need different credentials per mount, you can specify that using the `config/` path of the mount point.  For example, to specify a credential file JSON certificate for the `/gcpcab` mount:
+
+```
+vault write gcpcab/config \
+  credentials=@/path/to/svc_account.json
 ```
