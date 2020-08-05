@@ -100,9 +100,10 @@ gcloud iam service-accounts create generic-server --display-name "Generic Servic
 gsutil mb gs://$BUCKET_1
 gsutil mb gs://$BUCKET_2
 
-echo foo > file1.txt
+echo foo1 > file1.txt
+echo foo2 > file2.txt
 gsutil cp file1.txt gs://$BUCKET_1/
-gsutil cp file1.txt gs://$BUCKET_2/
+gsutil cp file2.txt gs://$BUCKET_2/
 
 gsutil uniformbucketlevelaccess set on gs://$BUCKET_1
 gsutil uniformbucketlevelaccess set on gs://$BUCKET_2
@@ -249,8 +250,8 @@ Now use that token to access GCS buckets:
 ```bash
 export TOKEN=ya29.dr....
 
-curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_1/o
-curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_2/o
+curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_1/o/file1.txt
+curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_2/o/file2.txt
 
 200
 403
@@ -270,12 +271,20 @@ Use the corresponding CAB definition to do the override:  `cab_override.json` wh
 {
 	"accessBoundaryRules" : [
 	  {
-		"availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
-		"availablePermissions": ["inRole:roles/storage.objectViewer"]
-      },
-      {
-		"availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_2",
-		"availablePermissions": ["inRole:roles/storage.objectViewer"]
+      "availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
+      "availablePermissions": ["inRole:roles/storage.objectViewer"],
+      "availabilityCondition" : {
+          "title" : "obj-exact",
+          "expression" : "resource.name == \"projects/_/buckets/$BUCKET_1/objects/file1.txt\""
+      }	      
+    },
+    {
+      "availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_2",
+      "availablePermissions": ["inRole:roles/storage.objectViewer"],
+      "availabilityCondition" : {
+          "title" : "obj-exact",
+          "expression" : "resource.name == \"projects/_/buckets/$BUCKET_2/objects/file2.txt\""
+      }	       
 	  }      
 	]
 }
@@ -293,15 +302,15 @@ access_token    ya29.dr.ATVe...
 ```
 
 ```bash
-curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_1/o
-curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_2/o
+curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_1/o/file1.txt
+curl -s -H "Authorization: Bearer $TOKEN"  -o /dev/null  -w "%{http_code}\n" https://storage.googleapis.com/storage/v1/b/$BUCKET_2/o/file2.txt
 
 200
 200
 ```
 Since the derived CAB config the user set allows for both bucket read, you'll see `200` responses
 
-### Impersonated TOKEN
+### Impersonated Token
 
 You can also optionally request a completely unrestricted token.  That is, you can apply a policy to return the non attenuated token for `IMPERSONATED_SERVICE_ACCOUNT`.
 

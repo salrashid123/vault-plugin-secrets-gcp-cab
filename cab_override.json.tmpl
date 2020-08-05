@@ -1,12 +1,22 @@
 {
+  "accessBoundary" : {
 	"accessBoundaryRules" : [
 	  {
 		"availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
-		"availablePermissions": ["inRole:roles/storage.objectViewer"]
+		"availablePermissions": ["inRole:roles/storage.objectViewer"],
+        "availabilityCondition" : {
+          "title" : "obj-exact",
+          "expression" : "resource.name == \"projects/_/buckets/$BUCKET_1/objects/file1.txt\""
+        }
       },
       {
 		"availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_2",
-		"availablePermissions": ["inRole:roles/storage.objectViewer"]
+		"availablePermissions": ["inRole:roles/storage.objectViewer"],
+        "availabilityCondition" : {
+          "title" : "obj-exact",
+          "expression" : "resource.name == \"projects/_/buckets/$BUCKET_2/objects/file2.txt\""
+        }		
 	  }      
 	]
+  }
 }

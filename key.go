@@ -7,31 +7,42 @@ import (
 
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/logical"
+	sal "github.com/salrashid123/oauth2/google"
 )
 
 var (
 	ErrKeyNotFound = errors.New("Config Key Name not found")
 )
 
-type CABRule struct {
-	AvailableResource    string   `json:"availableResource"`
-	AvailablePermissions []string `json:"availablePermissions"`
-}
+// type CABDownscopedOptions struct {
+// 	AccessBoundary CABAccessBoundary `json:"accessBoundary"`
+// }
 
-type CABRules struct {
-	AccessBoundaryRules []CABRule `json:"accessBoundaryRules"`
-}
+// type CABAccessBoundary struct {
+// 	AccessBoundaryRules []CABAccessBoundaryRule `json:"accessBoundaryRules"`
+// }
+
+// type CABAvailabilityCondition struct {
+// 	Title      string `json:"title,omitempty"`
+// 	Expression string `json:"expression,omitempty"`
+// }
+
+// type CABAccessBoundaryRule struct {
+// 	AvailableResource     string                   `json:"availableResource"`
+// 	AvailablePermissions  []string                 `json:"availablePermissions"`
+// 	AvailabilityCondition CABAvailabilityCondition `json:"availabilityCondition,omitempty"`
+// }
 
 // Key represents a key from the storage backend.
 type ConfigSpec struct {
-	Restricted           bool     `json:"restricted"`
-	TargetServiceAccount string   `json:"target_service_account"`
-	Project              string   `json:"project"`
-	Scopes               []string `json:"scopes"`
-	Delegates            []string `json:"delegates"`
-	Duration             int      `json:"duration"`
-	Bindings             CABRules `json:cabrules`
-	RawToken             bool     `json:raw_token`
+	Restricted           bool                  `json:"restricted"`
+	TargetServiceAccount string                `json:"target_service_account"`
+	Project              string                `json:"project"`
+	Scopes               []string              `json:"scopes"`
+	Delegates            []string              `json:"delegates"`
+	Duration             int                   `json:"duration"`
+	Bindings             sal.DownscopedOptions `json:downscoped_options`
+	RawToken             bool                  `json:raw_token`
 }
 
 // Key retrieves the named key from the storage backend, or an error if one does

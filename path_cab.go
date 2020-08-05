@@ -57,13 +57,13 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	configref := d.Get("config").(string)
 
 	name = d.Get("name").(string)
-	cab := &CABRules{}
+	dso := &sal.DownscopedOptions{}
 	if v, ok := d.GetOk("bindings"); ok {
 		if v.(string) == "" {
 			return logical.ErrorResponse("bindings cannot be null"), logical.ErrInvalidRequest
 		} else {
 			s := v.(string)
-			err := json.Unmarshal([]byte(s), &cab)
+			err := json.Unmarshal([]byte(s), &dso)
 			if err != nil {
 				return logical.ErrorResponse("Could Not parse CAB Bindings File"), logical.ErrInvalidRequest
 			}
@@ -80,7 +80,7 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 		return nil, err
 	}
 
-	if k.Restricted && len(cab.AccessBoundaryRules) > 0 {
+	if k.Restricted && len(dso.AccessBoundary.AccessBoundaryRules) > 0 {
 		b.Logger().Debug(" Cannot set Boundary rules on Restricted Token")
 		return logical.ErrorResponse("Cannot set Boundary rules on Restricted Token"), logical.ErrInvalidRequest
 	}
@@ -142,29 +142,32 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	}
 
 	var salsrules []sal.AccessBoundaryRule
-	var cabRules []CABRule
+	var cabRules []sal.AccessBoundaryRule
 
-	if len(cab.AccessBoundaryRules) > 0 {
-		cabRules = cab.AccessBoundaryRules
+	if len(dso.AccessBoundary.AccessBoundaryRules) > 0 {
+		cabRules = dso.AccessBoundary.AccessBoundaryRules
 	} else {
-		cabRules = k.Bindings.AccessBoundaryRules
+		cabRules = k.Bindings.AccessBoundary.AccessBoundaryRules
 	}
 
 	for _, vals := range cabRules {
 
 		rule := sal.AccessBoundaryRule{
-			AvailableResource:    vals.AvailableResource,
-			AvailablePermissions: vals.AvailablePermissions,
+			AvailableResource:     vals.AvailableResource,
+			AvailablePermissions:  vals.AvailablePermissions,
+			AvailabilityCondition: vals.AvailabilityCondition,
 		}
 		salsrules = append(salsrules, rule)
 	}
 
 	b.Logger().Debug("Access Boundary Rule %v ", salsrules)
 
+	dso.AccessBoundary.AccessBoundaryRules = salsrules
+
 	downScopedTokenSource, err := sal.DownScopedTokenSource(
 		&sal.DownScopedTokenConfig{
-			RootTokenSource:     tokenSource,
-			AccessBoundaryRules: salsrules,
+			RootTokenSource:   tokenSource,
+			DownscopedOptions: *dso,
 		},
 	)
 	tok, err := downScopedTokenSource.Token()

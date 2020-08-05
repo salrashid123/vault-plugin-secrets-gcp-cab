@@ -1,8 +1,14 @@
 {
-	"accessBoundaryRules" : [
-	  {
-		"availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
-		"availablePermissions": ["inRole:roles/storage.objectViewer"]
-      }
-	]
+  "accessBoundary" : {
+      "accessBoundaryRules" : [
+        {
+          "availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
+          "availablePermissions": ["inRole:roles/storage.objectViewer"],
+          "availabilityCondition" : {
+            "title" : "obj-prefixes",
+            "expression" : "resource.name.startsWith(\"projects/_/buckets/$BUCKET_1/objects/file1.txt\")"
+          }
+        }
+      ]
+  }
 }
