@@ -22,6 +22,8 @@ require (
 	github.com/kr/pretty v0.1.0 // indirect
 	github.com/pquerna/cachecontrol v0.0.0-20180517163645-1555304b9b35 // indirect
 	github.com/salrashid123/oauth2 v0.0.0-20200805120555-7668159e4da2
+	github.com/salrashid123/oauth2/downscoped v0.0.0-20201101202208-bfe6ca80bc5d
+	github.com/salrashid123/oauth2/impersonate v0.0.0-20201101202208-bfe6ca80bc5d
 	github.com/satori/go.uuid v1.2.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
 	golang.org/x/text v0.3.2 // indirect

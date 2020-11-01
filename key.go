@@ -7,7 +7,7 @@ import (
 
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/logical"
-	sal "github.com/salrashid123/oauth2/google"
+	sal "github.com/salrashid123/oauth2/downscoped"
 )
 
 var (

@@ -7,7 +7,8 @@ import (
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
-	sal "github.com/salrashid123/oauth2/google"
+	sal "github.com/salrashid123/oauth2/downscoped"
+	isal "github.com/salrashid123/oauth2/impersonate"
 )
 
 func (b *backend) pathCAB() *framework.Path {
@@ -113,8 +114,8 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	}
 	dlifetime := time.Duration(lifetime) * time.Second
 
-	tokenSource, err := sal.ImpersonatedTokenSource(
-		&sal.ImpersonatedTokenConfig{
+	tokenSource, err := isal.ImpersonatedTokenSource(
+		&isal.ImpersonatedTokenConfig{
 			RootTokenSource: creds.TokenSource,
 			TargetPrincipal: k.TargetServiceAccount,
 			TargetScopes:    k.Scopes,
