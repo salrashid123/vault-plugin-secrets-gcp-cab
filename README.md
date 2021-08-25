@@ -5,17 +5,33 @@ Vault plugin that exchanges a `VAULT_TOKEN` for a GCP `access_token` that as att
 
 The existing GCP `access_token` secrets plugin plugin Vault provides uses the credentials Vault is seeded with to create additional serviceAccounts "per roleset" and then assign them IAM permissions on GCP resources.  Essentially, its creating N service account and then applying permissions.  This technique has several limitations which is described [in the docs](https://www.vaultproject.io/docs/secrets/gcp#service-accounts-are-tied-to-rolesets).
 
-In contrast, this plugin uses Vaults Service Account to perform [IAM Impersonation](https://cloud.google.com/iam/docs/creating-short-lived-service-account-credentials) on another Service Account and from there derive an `access_token`.  From there, the access_token that represents the target service account can be restricted further by applying [Credential Access Boundary](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials) rules.
+In contrast, this plugin uses Vaults Service Account to perform [IAM Impersonation](https://cloud.google.com/iam/docs/creating-short-lived-service-account-credentials) on another Service Account an `access_token`.  From there, the access_token that represents the target service account can be restricted further by applying [Credential Access Boundary](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials) rules.
 
 In other words, this plugin does not create new service accounts but rather assumes the identity of another service account and then attenuates the scope of GCP resources that new token can access.
 
 There are two modes of operation:
 
 1. `Restricted Token`
-   In this mode, the VAULT admin defines a policy that stipulates the specific service account a Vault Policy can assume and the CAB resources they apply to.  A `VAULT_TOKEN` bearer cannot request extensions to include resources beyond what the admin defined
+   In this mode, the VAULT admin defines a policy that stipulates the specific service account a client can assume and the CAB resources it apply to.  
+   A `VAULT_TOKEN` bearer cannot request extensions to include resources beyond what the admin defined
+
+   * vault admin defines restricted policy on resourceA
+   * client -> vault_server 
+   * vault_server return CAB token 
+   * client uses CAB token to access resourceA
 
 2. `Unrestricted Token`
-   In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to  request a CAB with resources it wishes to access.  That is, the vault admin defines the service account to impersonate and leaves it upto the user to define the set of resources the `access_token` is valid against.  The user cannot ofcourse acquire a valid token capable of accessing any resource the impersonated credential doens't have access to anyway.
+   In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to get an `access_token` that represents the impersonated account but the token is not attenuated.
+   This mode is essentially impersonation _except_ that the vault admin can define basic settings like lifetime, delegation and scopes for the impersonated token.
+
+   * vault admin defines unrestricted policy
+   * client -> vault_server 
+   * vault_server return  token 
+   * client uses token to access resources the impersonated token has access to 
+
+ 2. `Impersonation`
+   In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to get an `access_token` that represents the impersonated account but the token is not attenuated.
+   This mode is service account impersonation without scope or lifetime overrides an admin may have set as would be the case with an unrestricted token 
 
 *Downscoped tokens only work with certain services like GCS*
 
@@ -270,7 +286,7 @@ Use the corresponding CAB definition to do the override:  `cab_override.json` wh
 
 ```json
 {
-	"accessBoundaryRules" : [
+"accessBoundaryRules" : [
 	  {
       "availableResource" : "//storage.googleapis.com/projects/_/buckets/$BUCKET_1",
       "availablePermissions": ["inRole:roles/storage.objectViewer"],
@@ -285,9 +301,9 @@ Use the corresponding CAB definition to do the override:  `cab_override.json` wh
       "availabilityCondition" : {
           "title" : "obj-exact",
           "expression" : "resource.name == \"projects/_/buckets/$BUCKET_2/objects/file2.txt\""
-      }	       
-	  }      
-	]
+       }       
+    }   
+ ]
 }
 ```
 
