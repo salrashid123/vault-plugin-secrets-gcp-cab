@@ -22,10 +22,6 @@ There are two modes of operation:
 
 >>> NOTE: this repository and plugin is NOT supported by Google
 
-For more information on CAB and the libraries used here
-
-- [Using Credential Access Boundary (DownScoped) Tokens](https://github.com/salrashid123/downscoped_token)
-- [golang DownScopedTokenSource](https://github.com/salrashid123/oauth2#usage-downscoped)
 
 ### How it works..
 
