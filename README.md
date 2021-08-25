@@ -37,17 +37,16 @@ import (
     targetPrincipal := "impersonated-account@project.iam.gserviceaccount.com"
     lifetime := 30 * time.Second
     delegates := []string{}
-    targetScopes := []string{"https://www.googleapis.com/auth/devstorage.read_only",
-        "https://www.googleapis.com/auth/cloud-platform"}
+    targetScopes := []string{"https://www.googleapis.com/auth/cloud-platform"}
 
-	  creds, _ := google.FindDefaultCredentials(ctx, cloudPlatformScope)
+    creds, _ := google.FindDefaultCredentials(ctx, cloudPlatformScope)
 
     // first impersonate the target service account
     impersonatedTokenSource, _err_ := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
       TargetPrincipal: targetPrincipal,
       Scopes:          targetScopes,
-		  Lifetime:        lifetime,
-		  Delegates:       delegates,
+      Lifetime:        lifetime,
+      Delegates:       delegates,
     }, option.WithCredentials(creds))
 
     // then downscope that impersonated account
