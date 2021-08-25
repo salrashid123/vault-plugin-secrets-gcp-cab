@@ -23,7 +23,7 @@ path "gcpcab/cab/config/myconfig" {
       "duration" = ["3000"]
       "scopes" = ["https://www.googleapis.com/auth/cloud-platform"]
       "restricted" = [true]
-      "bindings" = ["{  \"accessBoundary\" : {      \"accessBoundaryRules\" : [        {          \"availableResource\" : \"//storage.googleapis.com/projects/_/buckets/$BUCKET_1\",          \"availablePermissions\": [\"inRole:roles/storage.objectViewer\"],          \"availabilityCondition\" : {            \"title\" : \"obj-prefixes\",            \"expression\" : \"resource.name.startsWith(\\\"projects/_/buckets/$BUCKET_1/objects/file1.txt\\\")\"          }        }      ]  }}"]
+      "bindings" = ["{  \"accessBoundaryRules\" : [        {          \"availableResource\" : \"//storage.googleapis.com/projects/_/buckets/$BUCKET_1\",          \"availablePermissions\": [\"inRole:roles/storage.objectViewer\"],          \"availabilityCondition\" : {            \"title\" : \"obj-prefixes\",            \"expression\" : \"resource.name.startsWith(\\\"projects/_/buckets/$BUCKET_1/objects/file1.txt\\\")\"          }        }      ]  }"]
   }
 }
 

@@ -7,8 +7,9 @@ import (
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
-	sal "github.com/salrashid123/oauth2/downscoped"
-	isal "github.com/salrashid123/oauth2/impersonate"
+	"golang.org/x/oauth2/google/downscope"
+	"google.golang.org/api/impersonate"
+	"google.golang.org/api/option"
 )
 
 func (b *backend) pathCAB() *framework.Path {
@@ -51,6 +52,10 @@ Duration of the Impersonated Tokens
 	}
 }
 
+type AccessBoundary struct {
+	AccessBoundaryRules []downscope.AccessBoundaryRule `json:"accessBoundaryRules"`
+}
+
 func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	var name string
 
@@ -58,7 +63,7 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	configref := d.Get("config").(string)
 
 	name = d.Get("name").(string)
-	dso := &sal.DownscopedOptions{}
+	dso := &AccessBoundary{}
 	if v, ok := d.GetOk("bindings"); ok {
 		if v.(string) == "" {
 			return logical.ErrorResponse("bindings cannot be null"), logical.ErrInvalidRequest
@@ -81,7 +86,7 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 		return nil, err
 	}
 
-	if k.Restricted && len(dso.AccessBoundary.AccessBoundaryRules) > 0 {
+	if k.Restricted && len(dso.AccessBoundaryRules) > 0 {
 		b.Logger().Debug(" Cannot set Boundary rules on Restricted Token")
 		return logical.ErrorResponse("Cannot set Boundary rules on Restricted Token"), logical.ErrInvalidRequest
 	}
@@ -114,15 +119,12 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 	}
 	dlifetime := time.Duration(lifetime) * time.Second
 
-	tokenSource, err := isal.ImpersonatedTokenSource(
-		&isal.ImpersonatedTokenConfig{
-			RootTokenSource: creds.TokenSource,
-			TargetPrincipal: k.TargetServiceAccount,
-			TargetScopes:    k.Scopes,
-			Lifetime:        dlifetime,
-			Delegates:       k.Delegates,
-		},
-	)
+	tokenSource, err := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+		TargetPrincipal: k.TargetServiceAccount,
+		Scopes:          k.Scopes,
+		Lifetime:        dlifetime,
+		Delegates:       k.Delegates,
+	}, option.WithCredentials(creds))
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
 	}
@@ -142,39 +144,39 @@ func (b *backend) pathCABWrite(ctx context.Context, req *logical.Request, d *fra
 		}, nil
 	}
 
-	var salsrules []sal.AccessBoundaryRule
-	var cabRules []sal.AccessBoundaryRule
+	var salsrules []downscope.AccessBoundaryRule
+	var cabRules []downscope.AccessBoundaryRule
 
-	if len(dso.AccessBoundary.AccessBoundaryRules) > 0 {
-		cabRules = dso.AccessBoundary.AccessBoundaryRules
+	if len(dso.AccessBoundaryRules) > 0 {
+		cabRules = dso.AccessBoundaryRules
 	} else {
-		cabRules = k.Bindings.AccessBoundary.AccessBoundaryRules
+		cabRules = k.Bindings.AccessBoundaryRules
 	}
 
 	for _, vals := range cabRules {
 
-		rule := sal.AccessBoundaryRule{
-			AvailableResource:     vals.AvailableResource,
-			AvailablePermissions:  vals.AvailablePermissions,
-			AvailabilityCondition: vals.AvailabilityCondition,
+		rule := downscope.AccessBoundaryRule{
+			AvailableResource:    vals.AvailableResource,
+			AvailablePermissions: vals.AvailablePermissions,
+			Condition:            vals.Condition,
 		}
 		salsrules = append(salsrules, rule)
 	}
 
 	b.Logger().Debug("Access Boundary Rule %v ", salsrules)
 
-	dso.AccessBoundary.AccessBoundaryRules = salsrules
+	dso.AccessBoundaryRules = salsrules
 
-	downScopedTokenSource, err := sal.DownScopedTokenSource(
-		&sal.DownScopedTokenConfig{
-			RootTokenSource:   tokenSource,
-			DownscopedOptions: *dso,
-		},
-	)
+	downScopedTokenSource, err := downscope.NewTokenSource(ctx, downscope.DownscopingConfig{RootSource: tokenSource, Rules: salsrules})
+	if err != nil {
+		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
+	}
+
 	tok, err := downScopedTokenSource.Token()
 	if err != nil {
 		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
 	}
+
 	b.Logger().Debug("Issued access_token %v ", tok.AccessToken)
 
 	return &logical.Response{

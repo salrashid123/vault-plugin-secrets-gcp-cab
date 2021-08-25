@@ -3,14 +3,12 @@ module github.com/salrashid123/vault-plugin-secrets-gcp-cab
 go 1.12
 
 require (
-	cloud.google.com/go v0.56.0
+	cloud.google.com/go v0.90.0
 	github.com/armon/go-radix v1.0.0 // indirect
 	github.com/coreos/go-oidc v2.2.1+incompatible // indirect
 	github.com/gammazero/deque v0.0.0-20190130191400-2afb3858e9c7 // indirect
 	github.com/gammazero/workerpool v0.0.0-20190406235159-88d534f22b56
-	github.com/golang/protobuf v1.3.5 // indirect
 	github.com/google/go-tpm v0.3.0 // indirect
-	github.com/google/uuid v1.1.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0
 	github.com/hashicorp/go-hclog v0.12.0
 	github.com/hashicorp/go-multierror v1.0.0 // indirect
@@ -25,11 +23,10 @@ require (
 	github.com/salrashid123/oauth2/downscoped v0.0.0-20201101202208-bfe6ca80bc5d
 	github.com/salrashid123/oauth2/impersonate v0.0.0-20201101202208-bfe6ca80bc5d
 	github.com/satori/go.uuid v1.2.0 // indirect
-	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/text v0.3.2 // indirect
-	google.golang.org/api v0.23.0
-	google.golang.org/genproto v0.0.0-20200331122359-1ee6d9798940
-	google.golang.org/grpc v1.28.0 // indirect
+	golang.org/x/oauth2 v0.0.0-20210819190943-2bc19b11175f
+	google.golang.org/api v0.54.0
+	google.golang.org/genproto v0.0.0-20210805201207-89edb61ffb67
 	gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127 // indirect
+	gopkg.in/square/go-jose.v2 v2.3.1 // indirect
 
 )

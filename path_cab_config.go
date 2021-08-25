@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/errwrap"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
-	sal "github.com/salrashid123/oauth2/downscoped"
 )
 
 func (b *backend) pathCABConfigCRUD() *framework.Path {
@@ -165,7 +164,7 @@ func (b *backend) pathCABConfigWrite(ctx context.Context, req *logical.Request, 
 		if v.(string) == "" {
 			return logical.ErrorResponse("bindings cannot be null"), logical.ErrInvalidRequest
 		} else {
-			var cab sal.DownscopedOptions
+			var cab AccessBoundary
 			s := v.(string)
 			err = json.Unmarshal([]byte(s), &cab)
 			if err != nil {

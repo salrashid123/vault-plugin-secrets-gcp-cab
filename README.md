@@ -29,10 +29,14 @@ For more information on CAB and the libraries used here
 
 ### How it works..
 
-Basically, the code uses Vaults Credentials to impersonate a service account and then downscope it as shown [here](https://gist.github.com/salrashid123/c894e3029be76243761709cf834c7ed1)
+Basically, the code uses Vaults Credentials to impersonate a service account and then downscope 
 
 ```golang
-    defaultTokenSource, err := google.DefaultTokenSource(ctx, "https://www.googleapis.com/auth/iam")
+import (
+	"golang.org/x/oauth2/google/downscope"
+	"google.golang.org/api/impersonate"
+	"google.golang.org/api/option"
+)
 
     targetPrincipal := "impersonated-account@project.iam.gserviceaccount.com"
     lifetime := 30 * time.Second
@@ -40,29 +44,29 @@ Basically, the code uses Vaults Credentials to impersonate a service account and
     targetScopes := []string{"https://www.googleapis.com/auth/devstorage.read_only",
         "https://www.googleapis.com/auth/cloud-platform"}
 
-    impersonatedTokenSource, err := sal.ImpersonatedTokenSource(
-        &sal.ImpersonatedTokenConfig{
-            RootTokenSource: defaultTokenSource,
-            TargetPrincipal: targetPrincipal,
-            Lifetime:        lifetime,
-            Delegates:       delegates,
-            TargetScopes:    targetScopes,
-        },
-    )
+	  creds, _ := google.FindDefaultCredentials(ctx, cloudPlatformScope)
 
-    downScopedTokenSource, err := sal.DownScopedTokenSource(
-        &sal.DownScopedTokenConfig{
-            RootTokenSource: impersonatedTokenSource,
-            AccessBoundaryRules: []sal.AccessBoundaryRule{
-                sal.AccessBoundaryRule{
-                    AvailableResource: "//storage.googleapis.com/projects/_/buckets/" + bucketName,
-                    AvailablePermissions: []string{
-                        "inRole:roles/storage.objectViewer",
-                    },
-                },
-            },
+    // first impersonate the target service account
+    impersonatedTokenSource, _err_ := impersonate.CredentialsTokenSource(ctx, impersonate.CredentialsConfig{
+      TargetPrincipal: targetPrincipal,
+      Scopes:          targetScopes,
+		  Lifetime:        lifetime,
+		  Delegates:       delegates,
+    }, option.WithCredentials(creds))
+
+    // then downscope that impersonated account
+    accessBoundary := []downscope.AccessBoundaryRule{
+      {
+        AvailableResource:    "//storage.googleapis.com/projects/_/buckets/" + bucketName,
+        AvailablePermissions: []string{"inRole:roles/storage.objectViewer"},
+        Condition: &downscope.AvailabilityCondition{
+          Expression: expression,
         },
-    )
+      },
+    }
+
+    downScopedTokenSource, _ := downscope.NewTokenSource(ctx, downscope.DownscopingConfig{RootSource: impersonatedTokenSource, Rules: accessBoundary})
+
     // return token from the downScopedTokenSource()
 ```
 
@@ -71,9 +75,9 @@ Basically, the code uses Vaults Credentials to impersonate a service account and
 #### Setup
 
 The following quick start uses Vault in `dev` mode.  You'll need 
-- `golang1.14`
+- `golang1.16+`
 - `make`
-- `Vault` 
+- `Vault v1.8.1` 
 
 First configure the two service accounts.
 
@@ -157,6 +161,8 @@ For vault in `-dev` mode:
 
 ```bash
 export VAULT_ADDR='http://localhost:8200'
+# set the VAULT_TOKEN if -dev  switch is not used for vault server
+# export VAULT_TOKEN=
 
 export SHASUM=$(shasum -a 256 "bin/vault-plugin-secrets-gcp-cab" | cut -d " " -f1)
 
