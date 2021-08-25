@@ -5,7 +5,7 @@ Vault plugin that exchanges a `VAULT_TOKEN` for a GCP `access_token` that as att
 
 The existing GCP `access_token` secrets plugin plugin Vault provides uses the credentials Vault is seeded with to create additional serviceAccounts "per roleset" and then assign them IAM permissions on GCP resources.  Essentially, its creating N service account and then applying permissions.  This technique has several limitations which is described [in the docs](https://www.vaultproject.io/docs/secrets/gcp#service-accounts-are-tied-to-rolesets).
 
-In contrast, this plugin uses Vaults Service Account to perform [IAM Impersonation](https://cloud.google.com/iam/docs/creating-short-lived-service-account-credentials) on another Service Account an `access_token`.  From there, the access_token that represents the target service account can be restricted further by applying [Credential Access Boundary](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials) rules.
+In contrast, this plugin uses Vaults Service Account to perform [IAM Impersonation](https://cloud.google.com/iam/docs/creating-short-lived-service-account-credentials) on another Service Account and get its `access_token`.  From there, the `access_token` that represents the target service account can be restricted further by applying [Credential Access Boundary](https://cloud.google.com/iam/docs/downscoping-short-lived-credentials) rules.
 
 In other words, this plugin does not create new service accounts but rather assumes the identity of another service account and then attenuates the scope of GCP resources that new token can access.
 
@@ -13,7 +13,7 @@ There are two modes of operation:
 
 1. `Restricted Token`
    In this mode, the VAULT admin defines a policy that stipulates the specific service account a client can assume and the CAB resources it apply to.  
-   A `VAULT_TOKEN` bearer cannot request extensions to include resources beyond what the admin defined
+   A `VAULT_TOKEN` bearer cannot request extensions to include resources beyond what the admin defined for the CAB
 
    * vault admin defines restricted policy on resourceA
    * client -> vault_server 
@@ -24,10 +24,13 @@ There are two modes of operation:
    In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to get an `access_token` that represents the impersonated account but the token is not attenuated.
    This mode is essentially impersonation _except_ that the vault admin can define basic settings like lifetime, delegation and scopes for the impersonated token.
 
-   * vault admin defines unrestricted policy
-   * client -> vault_server 
-   * vault_server return  token 
-   * client uses token to access resources the impersonated token has access to 
+   * vault admin defines unrestricted policy to impersonate serviceAccountA
+   * client requests an access_token from vault_server but stipulates a policy to resourceA
+   * vault_server return downscoped token 
+   * client uses token to access resourceA
+
+
+   the difference between 1 and 2 is that the admin defines the CAB restricts but in 2, the client requests the CAB restrict for a predefined service account that the admin assigned by policy.
 
  2. `Impersonation`
    In this mode, the VAULT admin defines a policy that allows the `VAULT_TOKEN` bearer to get an `access_token` that represents the impersonated account but the token is not attenuated.
