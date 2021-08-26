@@ -200,6 +200,8 @@ export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
 export IMPERSONATED_SERVICE_ACCOUNT=generic-server@$PROJECT_ID.iam.gserviceaccount.com
 
+# create restricted token
+
 vault write gcpcab/cab/config/myconfig  \
  project="$PROJECT_ID"  \
  target_service_account="$IMPERSONATED_SERVICE_ACCOUNT"  \
@@ -207,13 +209,6 @@ vault write gcpcab/cab/config/myconfig  \
  restricted=true \
  duration="3000" \
  bindings=@cab.json
-
-vault write gcpcab/cab/config/myunrestrictedconfig \
-  project="$PROJECT_ID" \
-  target_service_account="$IMPERSONATED_SERVICE_ACCOUNT"  \
-  scopes="https://www.googleapis.com/auth/cloud-platform" \
-  duration="3000" \
-  restricted=false 
 
 vault policy write restricted-policy -<<EOF
 path "gcpcab/cab/certname12020" {
@@ -225,6 +220,16 @@ path "gcpcab/cab/certname12020" {
 EOF
 
 vault token create -policy=restricted-policy
+
+
+## now create an unrestricted token
+
+vault write gcpcab/cab/config/myunrestrictedconfig \
+  project="$PROJECT_ID" \
+  target_service_account="$IMPERSONATED_SERVICE_ACCOUNT"  \
+  scopes="https://www.googleapis.com/auth/cloud-platform" \
+  duration="3000" \
+  restricted=false 
 
 vault policy write unrestricted-policy -<<EOF
 path "gcpcab/cab/certname22020" {
