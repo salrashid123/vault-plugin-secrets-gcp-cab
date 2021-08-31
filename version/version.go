@@ -7,7 +7,7 @@ const (
 	Name = "vault-plugin-secrets-gcp-cab"
 
 	// Version is the version of the release.
-	Version = "0.0.1"
+	Version = "1.0.0"
 )
 
 var (

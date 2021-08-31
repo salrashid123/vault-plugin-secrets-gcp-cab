@@ -9,6 +9,8 @@ In contrast, this plugin uses Vaults Service Account to perform [IAM Impersonati
 
 In other words, this plugin does not create new service accounts but rather assumes the identity of another service account and then attenuates the scope of GCP resources that new token can access.
 
+>> NOTE: since this plugin uses service account impersonation, the target account(s) to impersonate must already exist.
+
 There are two modes of operation:
 
 1. `Restricted Token`
@@ -96,24 +98,31 @@ The following quick start uses Vault in `dev` mode.  You'll need
 First configure the two service accounts.
 
 - `vault-server`:  This is the service account vault runs as
-- `generic-server`: This is the service account vault can impersonate
+- `impersonated-account`: This is the service account vault can impersonate
 
-Allow `vault-server` permission to impersonate `generic-server`
+Allow `vault-server` permission to impersonate `impersonated-account`
 
 Create two GCS Buckets and allow `generic-server` permissions on both.
 
+Allow vault's service account to impersonate `IMPERSONATED_SERVICE_ACCOUNT`
 
 ```bash
 export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
-export IMPERSONATED_SERVICE_ACCOUNT=generic-server@$PROJECT_ID.iam.gserviceaccount.com
 export BUCKET_1=$PROJECT_ID-cab1
 export BUCKET_2=$PROJECT_ID-cab2
 
 gcloud iam service-accounts create vault-server --display-name "Vault Root Service Account"
 gcloud iam service-accounts keys  create svc_account.json --iam-account=vault-server@$PROJECT_ID.iam.gserviceaccount.com
+export VAULT_SERVICE_ACCOUNT=vault-server@$PROJECT_ID.iam.gserviceaccount.com
 
-gcloud iam service-accounts create generic-server --display-name "Generic Service Account"
+gcloud iam service-accounts create impersonated-account --display-name "Impersonated Service Account"
+export IMPERSONATED_SERVICE_ACCOUNT=impersonated-account@$PROJECT_ID.iam.gserviceaccount.com
+
+echo $VAULT_SERVICE_ACCOUNT
+echo $IMPERSONATED_SERVICE_ACCOUNT
+echo $BUCKET_1
+echo $BUCKET_2
 
 gsutil mb gs://$BUCKET_1
 gsutil mb gs://$BUCKET_2
@@ -126,11 +135,12 @@ gsutil cp file2.txt gs://$BUCKET_2/
 gsutil uniformbucketlevelaccess set on gs://$BUCKET_1
 gsutil uniformbucketlevelaccess set on gs://$BUCKET_2
 
-gsutil iam ch serviceAccount:generic-server@$PROJECT_ID.iam.gserviceaccount.com:objectCreator,objectViewer gs://$BUCKET_1
-gsutil iam ch serviceAccount:generic-server@$PROJECT_ID.iam.gserviceaccount.com:objectViewer gs://$BUCKET_2
+gsutil iam ch serviceAccount:$IMPERSONATED_SERVICE_ACCOUNT:objectCreator,objectViewer gs://$BUCKET_1
+gsutil iam ch serviceAccount:$IMPERSONATED_SERVICE_ACCOUNT:objectViewer gs://$BUCKET_2
 
-gcloud iam service-accounts add-iam-policy-binding  generic-server@$PROJECT_ID.iam.gserviceaccount.com  --member=serviceAccount:vault-server@$PROJECT_ID.iam.gserviceaccount.com --role=roles/iam.serviceAccountTokenCreator
-
+# allow Vault service account to impersonate 
+gcloud iam service-accounts add-iam-policy-binding  $IMPERSONATED_SERVICE_ACCOUNT \
+ --member=serviceAccount:$VAULT_SERVICE_ACCOUNT --role=roles/iam.serviceAccountTokenCreator
 ```
 
 #### Configure Vault Policies
@@ -196,10 +206,6 @@ Then configure the policy you are interested in.   Make sure the the environment
 The following will configure both a restricted and unrestricted policy:
 
 ```bash
-export PROJECT_ID=`gcloud config get-value core/project`
-export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
-export IMPERSONATED_SERVICE_ACCOUNT=generic-server@$PROJECT_ID.iam.gserviceaccount.com
-
 # create restricted token
 
 vault write gcpcab/cab/config/myconfig  \
@@ -255,7 +261,7 @@ export VAULT_TOKEN=<yourtoken>
 
 export PROJECT_ID=`gcloud config get-value core/project`
 export PROJECT_NUMBER=`gcloud projects describe $PROJECT_ID --format="value(projectNumber)"`
-export IMPERSONATED_SERVICE_ACCOUNT=generic-server@$PROJECT_ID.iam.gserviceaccount.com
+export IMPERSONATED_SERVICE_ACCOUNT=impersonated-account@$PROJECT_ID.iam.gserviceaccount.com
 export BUCKET_1=$PROJECT_ID-cab1
 export BUCKET_2=$PROJECT_ID-cab2
 ```
@@ -365,26 +371,66 @@ vault write gcpcab/cab/certname62020 config="mytotallyunrestrictedconfig"
 
 ### Vault Plugin Registration for non-dev mode
 
-If your Vault is running in non-dev mode and you uses our own Certs for TLS in `server.conf`:
+If your Vault is running in non-dev mode and you uses our own Certs for TLS in `server.conf` on host `vault.domain.com`:
+
+- `server.conf`
 
 ```hcl
+backend "file" {
+  path = "/path/to/filebackend"
+}
+
+ui = true
+
 listener "tcp" {
   address = "vault.domain.com:8200"
-  tls_cert_file = "/path/to/tls_crt_vault.pem"
-  tls_key_file = "/path/to/tls_key_vault.pem"
+  tls_cert_file = "/path/to/crt_vault.pem"
+  tls_key_file = "/path/to/key_vault.pem"
 }
+
 api_addr = "https://vault.domain.com:8200"
-plugin_directory = "/path/to/vault/plugins"
+
+plugin_directory = "/path/to/plugins"
 ```
 
-Then register the plugin and specify the the path to the TLS Certificate Vault server uses (`-args="-ca-cert=..."`):
+(you can find the sample certs [here](https://gist.github.com/salrashid123/2506b1ae74db9c803a7dae2653bc20ee)).  If you wan to test this locally, edit `/etc/hosts` and set `127.0.0.1 vault.domain.com`
+
+- vault started with 
+
+  `vault server --config server.conf`
+
+- compile and install plugin
 
 ```bash
-export VAULT_CACERT=/path/to/tls_cacert.pem
+cd vault-plugin-secrets-gcp-cab
+mkdir -p bin
+export GOBIN=`pwd`/bin
+
+rm bin/vault-plugin-secrets-gcp-cab
+make fmt
+make dev
+
+export SHASUM=$(shasum -a 256 "bin/vault-plugin-secrets-gcp-cab" | cut -d " " -f1)
+echo $SHASUM 
+
+
+cp bin/vault-plugin-secrets-gcp-cab /apps/vault/plugins
+```
+
+- now register the plugin 
+
+```bash
+# assume this is the root token
+export VAULT_TOKEN=...
+export VAULT_SERVER=https://vault.domain.com:8200
+export VAULT_CACERT=/apps/vault/CA_crt.pem
+
 vault plugin register \
     -sha256="${SHASUM}" \
     -command="vault-plugin-secrets-gcp-cab" \
-    -args="-ca-cert=$VAULT_CACERT" secret gcpcab
+    -args="-ca-cert=$VAULT_CACERT" gcpcab
+
+vault secrets enable -path="gcpcab" --plugin-name='gcpcab' plugin
 ```
 
 ### Specify credentials per mount
